@@ -537,9 +537,9 @@ def get_bybit():
         })
 
 
-@app.before_first_request
+@app.before_request
 def _start_updater_on_first_request():
-    """Flask/Gunicorn ortamında ilk istekte updater'ı başlat."""
+    """Her istekte kontrol ederek updater'ın çalıştığından emin ol."""
     start_background_updater()
 
 
