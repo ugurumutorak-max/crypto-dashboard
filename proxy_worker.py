@@ -18,6 +18,7 @@ Ortam değişkenleri:
 """
 
 import os
+import sys
 import time
 import requests
 from datetime import datetime
@@ -27,6 +28,20 @@ from crypto_web_dashboard import (
     process_binance,
     process_bybit
 )
+
+
+def _ensure_utf8_stdio():
+    """Terminal latin-1 olsa bile stdout/stderr'i UTF-8'e ayarla."""
+    for stream_name in ("stdout", "stderr"):
+        stream = getattr(sys, stream_name, None)
+        if stream and hasattr(stream, "reconfigure"):
+            try:
+                stream.reconfigure(encoding="utf-8")
+            except Exception:
+                pass
+
+
+_ensure_utf8_stdio()
 
 DASHBOARD_URL = os.environ.get('DASHBOARD_URL', 'https://crypto-dashboard-uh1e.onrender.com')
 WORKER_SECRET = os.environ.get('WORKER_SECRET')
