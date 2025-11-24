@@ -410,6 +410,34 @@ def update_data():
     """Verileri günceller."""
     global data_store
     
+    # İlk veriyi hemen topla
+    print("\n" + "="*80)
+    print(f"[UPDATE] Ilk veri guncelleniyor... {datetime.now().strftime('%H:%M:%S')}")
+    print("="*80)
+    
+    try:
+        mexc_futures_coins, mexc_positions_map, mexc_list = process_mexc()
+        
+        if mexc_futures_coins is not None and mexc_positions_map is not None:
+            binance_list = process_binance(mexc_futures_coins, mexc_positions_map)
+            bybit_list = process_bybit(mexc_futures_coins, mexc_positions_map)
+            
+            with data_lock:
+                data_store['mexc_list'] = mexc_list
+                data_store['binance_list'] = binance_list
+                data_store['bybit_list'] = bybit_list
+                data_store['last_update'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                data_store['stats'] = {
+                    'mexc_count': len(mexc_list),
+                    'binance_count': len(binance_list),
+                    'bybit_count': len(bybit_list)
+                }
+            
+            print(f"\n[SUCCESS] Ilk veri yuklendi: MEXC={len(mexc_list)}, Binance={len(binance_list)}, Bybit={len(bybit_list)}")
+    except Exception as e:
+        print(f"[ERROR] Ilk veri yukleme hatasi: {e}")
+    
+    # Sonra döngüye gir
     while True:
         try:
             print("\n" + "="*80)
