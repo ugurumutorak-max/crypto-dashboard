@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crypto Listings Dashboard - Canlı</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            color: #667eea;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header .subtitle {
+            color: #666;
+            font-size: 1.1em;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            text-align: center;
+            transition: transform 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .stat-card h3 {
+            color: #667eea;
+            font-size: 1.2em;
+            margin-bottom: 10px;
+        }
+
+        .stat-card .number {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #764ba2;
+        }
+
+        .update-info {
+            background: rgba(255, 255, 255, 0.9);
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+            margin-bottom: 20px;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+        }
+
+        .update-info .status {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            background: #10b981;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+            margin-right: 8px;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .tab {
+            flex: 1;
+            min-width: 200px;
+            padding: 15px 30px;
+            background: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+        }
+
+        .tab:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+
+        .tab.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .table-container {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        table thead {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        table th {
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 1.1em;
+        }
+
+        table th:first-child {
+            border-top-left-radius: 10px;
+        }
+
+        table th:last-child {
+            border-top-right-radius: 10px;
+        }
+
+        table td {
+            padding: 15px;
+            border-bottom: 1px solid #eee;
+        }
+
+        table tbody tr {
+            transition: background 0.2s ease;
+        }
+
+        table tbody tr:hover {
+            background: #f8f9ff;
+        }
+
+        table tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        .rank {
+            font-weight: bold;
+            color: #667eea;
+            font-size: 1.1em;
+        }
+
+        .symbol {
+            font-weight: 600;
+            color: #333;
+            font-size: 1.1em;
+        }
+
+        .amount {
+            color: #10b981;
+            font-weight: 600;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 50px;
+            font-size: 1.3em;
+            color: #667eea;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 1.8em;
+            }
+
+            .stat-card .number {
+                font-size: 2em;
+            }
+
+            table {
+                font-size: 0.9em;
+            }
+
+            table th, table td {
+                padding: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 Crypto Listings Dashboard</h1>
+            <p class="subtitle">MEXC, Binance & Bybit - Saatlik Güncelleme</p>
+        </div>
+
+        <div class="update-info">
+            <span class="status"></span>
+            <strong>Saatlik Güncelleme:</strong> <span id="lastUpdate">Yükleniyor...</span>
+        </div>
+
+        <div class="stats">
+            <div class="stat-card">
+                <h3>MEXC Vadeli</h3>
+                <div class="number" id="mexcCount">-</div>
+                <p>Toplam Coin</p>
+            </div>
+            <div class="stat-card">
+                <h3>Binance'de Yok</h3>
+                <div class="number" id="binanceCount">-</div>
+                <p>MEXC'de Var</p>
+            </div>
+            <div class="stat-card">
+                <h3>Bybit'te Yok</h3>
+                <div class="number" id="bybitCount">-</div>
+                <p>MEXC'de Var</p>
+            </div>
+        </div>
+
+        <div class="tabs">
+            <button class="tab active" onclick="showTab('mexc')">
+                📊 MEXC Vadeli (Tümü)
+            </button>
+            <button class="tab" onclick="showTab('binance')">
+                🔴 MEXC Var - Binance Yok
+            </button>
+            <button class="tab" onclick="showTab('bybit')">
+                🟡 MEXC Var - Bybit Yok
+            </button>
+        </div>
+
+        <div id="mexc" class="tab-content active">
+            <div class="table-container">
+                <h2>MEXC Vadeli - Tüm Coinler</h2>
+                <div class="loading">
+                    <div class="spinner"></div>
+                    Veriler yükleniyor...
+                </div>
+                <table id="mexcTable" style="display:none;">
+                    <thead>
+                        <tr>
+                            <th>Sıra</th>
+                            <th>Coin</th>
+                            <th>Max Pozisyon (USDT)</th>
+                            <th>Market Cap</th>
+                        </tr>
+                    </thead>
+                    <tbody id="mexcBody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="binance" class="tab-content">
+            <div class="table-container">
+                <h2>MEXC'de VAR - Binance'de YOK</h2>
+                <div class="loading">
+                    <div class="spinner"></div>
+                    Veriler yükleniyor...
+                </div>
+                <table id="binanceTable" style="display:none;">
+                    <thead>
+                        <tr>
+                            <th>Sıra</th>
+                            <th>Coin</th>
+                            <th>MEXC Max Pozisyon</th>
+                            <th>Market Cap</th>
+                        </tr>
+                    </thead>
+                    <tbody id="binanceBody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="bybit" class="tab-content">
+            <div class="table-container">
+                <h2>MEXC'de VAR - Bybit'te YOK</h2>
+                <div class="loading">
+                    <div class="spinner"></div>
+                    Veriler yükleniyor...
+                </div>
+                <table id="bybitTable" style="display:none;">
+                    <thead>
+                        <tr>
+                            <th>Sıra</th>
+                            <th>Coin</th>
+                            <th>MEXC Max Pozisyon</th>
+                            <th>Market Cap</th>
+                        </tr>
+                    </thead>
+                    <tbody id="bybitBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentTab = 'mexc';
+
+        function showTab(tabName) {
+            // Tüm tab içeriklerini gizle
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            
+            // Tüm tab butonlarını pasif yap
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Seçili tab'ı göster
+            document.getElementById(tabName).classList.add('active');
+            event.target.classList.add('active');
+            currentTab = tabName;
+        }
+
+        function updateData() {
+            fetch('/api/data')
+                .then(response => response.json())
+                .then(data => {
+                    // Son güncelleme zamanını göster
+                    document.getElementById('lastUpdate').textContent = data.last_update || 'Güncelleniyor...';
+                    
+                    // İstatistikleri güncelle
+                    document.getElementById('mexcCount').textContent = data.stats.mexc_count || 0;
+                    document.getElementById('binanceCount').textContent = data.stats.binance_count || 0;
+                    document.getElementById('bybitCount').textContent = data.stats.bybit_count || 0;
+                    
+                    // MEXC tablosunu güncelle
+                    const mexcBody = document.getElementById('mexcBody');
+                    if (data.mexc_list && data.mexc_list.length > 0) {
+                        mexcBody.innerHTML = data.mexc_list.slice(0, 100).map(item => `
+                            <tr>
+                                <td class="rank">#${item.rank}</td>
+                                <td class="symbol">${item.symbol}</td>
+                                <td class="amount">${item.max_position_pretty}</td>
+                                <td>${item.market_cap_pretty}</td>
+                            </tr>
+                        `).join('');
+                        document.getElementById('mexcTable').style.display = 'table';
+                        document.querySelector('#mexc .loading').style.display = 'none';
+                    }
+                    
+                    // Binance tablosunu güncelle
+                    const binanceBody = document.getElementById('binanceBody');
+                    if (data.binance_list && data.binance_list.length > 0) {
+                        binanceBody.innerHTML = data.binance_list.slice(0, 100).map(item => `
+                            <tr>
+                                <td class="rank">#${item.rank}</td>
+                                <td class="symbol">${item.symbol}</td>
+                                <td class="amount">${item.max_position_pretty}</td>
+                                <td>${item.market_cap_pretty}</td>
+                            </tr>
+                        `).join('');
+                        document.getElementById('binanceTable').style.display = 'table';
+                        document.querySelector('#binance .loading').style.display = 'none';
+                    } else {
+                        binanceBody.innerHTML = '<tr><td colspan="4" style="text-align:center;">Veri yok</td></tr>';
+                    }
+                    
+                    // Bybit tablosunu güncelle
+                    const bybitBody = document.getElementById('bybitBody');
+                    if (data.bybit_list && data.bybit_list.length > 0) {
+                        bybitBody.innerHTML = data.bybit_list.slice(0, 100).map(item => `
+                            <tr>
+                                <td class="rank">#${item.rank}</td>
+                                <td class="symbol">${item.symbol}</td>
+                                <td class="amount">${item.max_position_pretty}</td>
+                                <td>${item.market_cap_pretty}</td>
+                            </tr>
+                        `).join('');
+                        document.getElementById('bybitTable').style.display = 'table';
+                        document.querySelector('#bybit .loading').style.display = 'none';
+                    } else {
+                        bybitBody.innerHTML = '<tr><td colspan="4" style="text-align:center;">Veri yok</td></tr>';
+                    }
+                })
+                .catch(error => {
+                    console.error('Veri güncellenirken hata:', error);
+                });
+        }
+
+        // Sayfa yüklendiğinde ilk veriyi çek
+        updateData();
+
+        // Her 1 saatte bir güncelle (3600000 milisaniye = 1 saat)
+        setInterval(updateData, 3600000);
+    </script>
+</body>
+</html>
