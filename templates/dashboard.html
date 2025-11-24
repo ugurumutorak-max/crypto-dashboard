@@ -214,6 +214,47 @@
             color: #667eea;
         }
 
+        .table-actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 10px;
+        }
+
+        .table-actions span {
+            font-weight: 600;
+            color: #4b5563;
+        }
+
+        .sort-buttons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .sort-button {
+            border: none;
+            border-radius: 8px;
+            padding: 8px 16px;
+            background: #eef2ff;
+            color: #4c1d95;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .sort-button:hover {
+            background: #c7d2fe;
+        }
+
+        .sort-button.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #fff;
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
         .spinner {
             border: 4px solid #f3f3f3;
             border-top: 4px solid #667eea;
@@ -279,13 +320,13 @@
         </div>
 
         <div class="tabs">
-            <button class="tab active" onclick="showTab('mexc')">
+            <button class="tab active" onclick="showTab('mexc', event)">
                 📊 MEXC Vadeli (Tümü)
             </button>
-            <button class="tab" onclick="showTab('binance')">
+            <button class="tab" onclick="showTab('binance', event)">
                 🔴 MEXC Var - Binance Yok
             </button>
-            <button class="tab" onclick="showTab('bybit')">
+            <button class="tab" onclick="showTab('bybit', event)">
                 🟡 MEXC Var - Bybit Yok
             </button>
         </div>
@@ -293,6 +334,14 @@
         <div id="mexc" class="tab-content active">
             <div class="table-container">
                 <h2>MEXC Vadeli - Tüm Coinler</h2>
+                <div class="table-actions">
+                    <span>Sıralama:</span>
+                    <div class="sort-buttons">
+                        <button class="sort-button active" data-table="mexc" data-key="rank" data-direction="asc">Sıra</button>
+                        <button class="sort-button" data-table="mexc" data-key="max_position" data-direction="desc">Max Pozisyon</button>
+                        <button class="sort-button" data-table="mexc" data-key="market_cap" data-direction="desc">Market Cap</button>
+                    </div>
+                </div>
                 <div class="loading">
                     <div class="spinner"></div>
                     Veriler yükleniyor...
@@ -314,6 +363,14 @@
         <div id="binance" class="tab-content">
             <div class="table-container">
                 <h2>MEXC'de VAR - Binance'de YOK</h2>
+                <div class="table-actions">
+                    <span>Sıralama:</span>
+                    <div class="sort-buttons">
+                        <button class="sort-button active" data-table="binance" data-key="rank" data-direction="asc">Sıra</button>
+                        <button class="sort-button" data-table="binance" data-key="max_position" data-direction="desc">Max Pozisyon</button>
+                        <button class="sort-button" data-table="binance" data-key="market_cap" data-direction="desc">Market Cap</button>
+                    </div>
+                </div>
                 <div class="loading">
                     <div class="spinner"></div>
                     Veriler yükleniyor...
@@ -335,6 +392,14 @@
         <div id="bybit" class="tab-content">
             <div class="table-container">
                 <h2>MEXC'de VAR - Bybit'te YOK</h2>
+                <div class="table-actions">
+                    <span>Sıralama:</span>
+                    <div class="sort-buttons">
+                        <button class="sort-button active" data-table="bybit" data-key="rank" data-direction="asc">Sıra</button>
+                        <button class="sort-button" data-table="bybit" data-key="max_position" data-direction="desc">Max Pozisyon</button>
+                        <button class="sort-button" data-table="bybit" data-key="market_cap" data-direction="desc">Market Cap</button>
+                    </div>
+                </div>
                 <div class="loading">
                     <div class="spinner"></div>
                     Veriler yükleniyor...
@@ -355,9 +420,27 @@
     </div>
 
     <script>
+        const tableConfig = {
+            mexc: { bodyId: 'mexcBody', tableId: 'mexcTable', loadingSelector: '#mexc .loading' },
+            binance: { bodyId: 'binanceBody', tableId: 'binanceTable', loadingSelector: '#binance .loading' },
+            bybit: { bodyId: 'bybitBody', tableId: 'bybitTable', loadingSelector: '#bybit .loading' }
+        };
+
+        const tableState = {
+            mexc: [],
+            binance: [],
+            bybit: []
+        };
+
+        const sortState = {
+            mexc: { key: 'rank', direction: 'asc' },
+            binance: { key: 'rank', direction: 'asc' },
+            bybit: { key: 'rank', direction: 'asc' }
+        };
+
         let currentTab = 'mexc';
 
-        function showTab(tabName) {
+        function showTab(tabName, evt) {
             // Tüm tab içeriklerini gizle
             document.querySelectorAll('.tab-content').forEach(content => {
                 content.classList.remove('active');
@@ -370,9 +453,67 @@
             
             // Seçili tab'ı göster
             document.getElementById(tabName).classList.add('active');
-            event.target.classList.add('active');
+            if (evt && evt.currentTarget) {
+                evt.currentTarget.classList.add('active');
+            }
             currentTab = tabName;
         }
+
+        function compareValues(a, b, key, direction) {
+            const valA = Number(a[key] ?? 0);
+            const valB = Number(b[key] ?? 0);
+
+            if (valA === valB) return 0;
+            return direction === 'asc' ? valA - valB : valB - valA;
+        }
+
+        function renderTable(tableName) {
+            const config = tableConfig[tableName];
+            const data = tableState[tableName];
+            const tableElement = document.getElementById(config.tableId);
+            const bodyElement = document.getElementById(config.bodyId);
+            const loadingEl = document.querySelector(config.loadingSelector);
+
+            if (!data || data.length === 0) {
+                bodyElement.innerHTML = '<tr><td colspan="4" style="text-align:center;">Veri yok</td></tr>';
+                tableElement.style.display = 'table';
+                if (loadingEl) loadingEl.style.display = 'none';
+                return;
+            }
+
+            const { key, direction } = sortState[tableName];
+            const sorted = [...data].sort((a, b) => compareValues(a, b, key, direction));
+            const limited = sorted.slice(0, 100);
+
+            bodyElement.innerHTML = limited.map((item, index) => `
+                <tr>
+                    <td class="rank">#${index + 1}</td>
+                    <td class="symbol">${item.symbol}</td>
+                    <td class="amount">${item.max_position_pretty}</td>
+                    <td>${item.market_cap_pretty}</td>
+                </tr>
+            `).join('');
+
+            tableElement.style.display = 'table';
+            if (loadingEl) loadingEl.style.display = 'none';
+        }
+
+        function setActiveSortButton(tableName, activeKey) {
+            document.querySelectorAll(`.sort-button[data-table="${tableName}"]`).forEach(button => {
+                button.classList.toggle('active', button.dataset.key === activeKey);
+            });
+        }
+
+        document.querySelectorAll('.sort-button').forEach(button => {
+            button.addEventListener('click', () => {
+                const tableName = button.dataset.table;
+                const key = button.dataset.key;
+                const direction = button.dataset.direction || 'desc';
+                sortState[tableName] = { key, direction };
+                setActiveSortButton(tableName, key);
+                renderTable(tableName);
+            });
+        });
 
         function updateData() {
             fetch('/api/data')
@@ -382,58 +523,18 @@
                     document.getElementById('lastUpdate').textContent = data.last_update || 'Güncelleniyor...';
                     
                     // İstatistikleri güncelle
-                    document.getElementById('mexcCount').textContent = data.stats.mexc_count || 0;
-                    document.getElementById('binanceCount').textContent = data.stats.binance_count || 0;
-                    document.getElementById('bybitCount').textContent = data.stats.bybit_count || 0;
-                    
-                    // MEXC tablosunu güncelle
-                    const mexcBody = document.getElementById('mexcBody');
-                    if (data.mexc_list && data.mexc_list.length > 0) {
-                        mexcBody.innerHTML = data.mexc_list.slice(0, 100).map(item => `
-                            <tr>
-                                <td class="rank">#${item.rank}</td>
-                                <td class="symbol">${item.symbol}</td>
-                                <td class="amount">${item.max_position_pretty}</td>
-                                <td>${item.market_cap_pretty}</td>
-                            </tr>
-                        `).join('');
-                        document.getElementById('mexcTable').style.display = 'table';
-                        document.querySelector('#mexc .loading').style.display = 'none';
-                    }
-                    
-                    // Binance tablosunu güncelle
-                    const binanceBody = document.getElementById('binanceBody');
-                    if (data.binance_list && data.binance_list.length > 0) {
-                        binanceBody.innerHTML = data.binance_list.slice(0, 100).map(item => `
-                            <tr>
-                                <td class="rank">#${item.rank}</td>
-                                <td class="symbol">${item.symbol}</td>
-                                <td class="amount">${item.max_position_pretty}</td>
-                                <td>${item.market_cap_pretty}</td>
-                            </tr>
-                        `).join('');
-                        document.getElementById('binanceTable').style.display = 'table';
-                        document.querySelector('#binance .loading').style.display = 'none';
-                    } else {
-                        binanceBody.innerHTML = '<tr><td colspan="4" style="text-align:center;">Veri yok</td></tr>';
-                    }
-                    
-                    // Bybit tablosunu güncelle
-                    const bybitBody = document.getElementById('bybitBody');
-                    if (data.bybit_list && data.bybit_list.length > 0) {
-                        bybitBody.innerHTML = data.bybit_list.slice(0, 100).map(item => `
-                            <tr>
-                                <td class="rank">#${item.rank}</td>
-                                <td class="symbol">${item.symbol}</td>
-                                <td class="amount">${item.max_position_pretty}</td>
-                                <td>${item.market_cap_pretty}</td>
-                            </tr>
-                        `).join('');
-                        document.getElementById('bybitTable').style.display = 'table';
-                        document.querySelector('#bybit .loading').style.display = 'none';
-                    } else {
-                        bybitBody.innerHTML = '<tr><td colspan="4" style="text-align:center;">Veri yok</td></tr>';
-                    }
+                    const stats = data.stats || {};
+                    document.getElementById('mexcCount').textContent = stats.mexc_count ?? (data.mexc_list ? data.mexc_list.length : 0);
+                    document.getElementById('binanceCount').textContent = stats.binance_count ?? (data.binance_list ? data.binance_list.length : 0);
+                    document.getElementById('bybitCount').textContent = stats.bybit_count ?? (data.bybit_list ? data.bybit_list.length : 0);
+
+                    tableState.mexc = data.mexc_list || [];
+                    tableState.binance = data.binance_list || [];
+                    tableState.bybit = data.bybit_list || [];
+
+                    renderTable('mexc');
+                    renderTable('binance');
+                    renderTable('bybit');
                 })
                 .catch(error => {
                     console.error('Veri güncellenirken hata:', error);
