@@ -458,6 +458,18 @@ def get_binance():
         })
 
 
+@app.route('/api/health')
+def health_check():
+    """Sunucu yapılandırma durumunu kontrol eder."""
+    return jsonify({
+        'status': 'running',
+        'worker_secret_configured': bool(WORKER_SECRET),
+        'worker_secret_length': len(WORKER_SECRET) if WORKER_SECRET else 0,
+        'server_binance_disabled': DISABLE_SERVER_BINANCE,
+        'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    })
+
+
 @app.route('/api/worker/update', methods=['POST'])
 def worker_update():
     """Arka plan worker'ından gelen verileri kabul eder."""
