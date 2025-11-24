@@ -53,6 +53,10 @@ data_store = {
 }
 data_lock = Lock()
 
+# Arka plan thread kontrolü
+update_thread = None
+update_thread_started = False
+
 # ---------------------------------------------------------------------------
 # UTILITY FUNCTIONS
 # ---------------------------------------------------------------------------
@@ -476,6 +480,16 @@ def update_data():
         time.sleep(3600)
 
 
+def start_background_updater():
+    """Arka plan veri güncelleyicisini bir kez başlat."""
+    global update_thread, update_thread_started
+    if not update_thread_started:
+        update_thread = Thread(target=update_data, daemon=True)
+        update_thread.start()
+        update_thread_started = True
+        print("[SERVER] Background updater baslatildi")
+
+
 # ---------------------------------------------------------------------------
 # FLASK ROUTES
 # ---------------------------------------------------------------------------
@@ -523,6 +537,12 @@ def get_bybit():
         })
 
 
+@app.before_first_request
+def _start_updater_on_first_request():
+    """Flask/Gunicorn ortamında ilk istekte updater'ı başlat."""
+    start_background_updater()
+
+
 # ---------------------------------------------------------------------------
 # MAIN
 # ---------------------------------------------------------------------------
@@ -535,8 +555,7 @@ def main():
     print("="*80)
     
     # Veri güncelleme thread'ini başlat
-    update_thread = Thread(target=update_data, daemon=True)
-    update_thread.start()
+    start_background_updater()
     
     print("\n[SERVER] Web sunucusu baslatiliyor...")
     print("[SERVER] Dashboard: http://127.0.0.1:5000")
