@@ -537,9 +537,9 @@ def get_bybit():
         })
 
 
-@app.before_serving
-def _start_updater_before_serving():
-    """Sunucu ilk isteği servis etmeden önce updater'ı başlat."""
+@app.before_request
+def _ensure_updater_running():
+    """Her istekten önce (gerekirse) updater thread'ini tetikle."""
     start_background_updater()
 
 
