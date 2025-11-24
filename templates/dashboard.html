@@ -483,9 +483,8 @@
 
             const { key, direction } = sortState[tableName];
             const sorted = [...data].sort((a, b) => compareValues(a, b, key, direction));
-            const limited = sorted.slice(0, 100);
 
-            bodyElement.innerHTML = limited.map((item, index) => `
+            bodyElement.innerHTML = sorted.map((item, index) => `
                 <tr>
                     <td class="rank">#${index + 1}</td>
                     <td class="symbol">${item.symbol}</td>
