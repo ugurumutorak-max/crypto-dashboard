@@ -1,12 +1,11 @@
 # 🚀 Crypto Listings Dashboard
 
-Web üzerinden MEXC, Binance ve Bybit vadeli işlem coinlerini karşılaştıran canlı dashboard.
+Web üzerinden MEXC vadeli işlem coinlerini ve Binance karşılaştırmasını sunan canlı dashboard.
 
 ## 📋 Özellikler
 
 - 📊 MEXC vadeli işlem coinlerinin tümü (max pozisyon + market cap)
 - 🔴 MEXC'de olup Binance'de olmayan coinler
-- 🟡 MEXC'de olup Bybit'te olmayan coinler
 - ⏱️ Saatlik otomatik güncelleme
 - 📱 Responsive (mobil uyumlu) tasarım
 - 🎨 Modern gradient tema
@@ -93,7 +92,7 @@ crypto-dashboard/
 
 - **Backend:** Python, Flask
 - **Frontend:** HTML, CSS, JavaScript
-- **API'ler:** MEXC, Binance, Bybit, CoinMarketCap
+- **API'ler:** MEXC, Binance, CoinMarketCap
 - **Deployment:** Render.com / Railway / PythonAnywhere
 
 ## 📊 API Endpoints
@@ -102,27 +101,26 @@ crypto-dashboard/
 - `GET /api/data` - Tüm veriler (JSON)
 - `GET /api/mexc` - MEXC vadeli listesi (JSON)
 - `GET /api/binance` - Binance karşılaştırması (JSON)
-- `GET /api/bybit` - Bybit karşılaştırması (JSON)
 - `POST /api/worker/update` - Proxy worker tarafından çağrılır (gizli anahtar gerektirir)
 
-## 🛰️ Proxy Worker ile Binance/Bybit Verileri
+## 🛰️ Proxy Worker ile Binance Verileri
 
-Render gibi ortamlarda Binance/Bybit API'leri engellendiğinde, `proxy_worker.py`
+Render gibi ortamlarda Binance API'leri engellendiğinde, `proxy_worker.py`
 dosyasıyla kendi bilgisayarınızdan verileri çekip dashboard'a gönderebilirsiniz.
 
 1. `.env` veya terminal ortamınıza gizli anahtar tanımlayın:
    ```bash
    export WORKER_SECRET=buraya-uzun-bir-anahtar-yazin
    export DASHBOARD_URL=https://crypto-dashboard-uh1e.onrender.com
-   export DISABLE_SERVER_BINANCE_BYBIT=1   # Render hizmeti için
+   export DISABLE_SERVER_BINANCE=1   # Render hizmeti için (eski DISABLE_SERVER_BINANCE_BYBIT de desteklenir)
    ```
-2. Render panelinde `WORKER_SECRET` ve `DISABLE_SERVER_BINANCE_BYBIT=1`
+2. Render panelinde `WORKER_SECRET` ve `DISABLE_SERVER_BINANCE=1`
    ortam değişkenlerini web servisine ekleyin.
 3. Kendi makinenizde (veya erişimi olan sunucuda) worker'ı başlatın:
    ```bash
    python proxy_worker.py
    ```
-4. Worker Binance/Bybit verilerini çekip `/api/worker/update` endpoint'ine
+4. Worker Binance verilerini çekip `/api/worker/update` endpoint'ine
    gönderecek; dashboard saniyeler içinde güncellenecek.
 
 > Not: Proxy kullanmanız gerekiyorsa worker'ı çalıştırdığınız terminalde

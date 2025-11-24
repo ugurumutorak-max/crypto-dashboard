@@ -29,15 +29,12 @@ MEXC_SPOT_TICKER_URL = "https://api.mexc.com/api/v3/ticker/price"
 BINANCE_SPOT_SYMBOLS_URL = "https://api.binance.com/api/v3/exchangeInfo"
 BINANCE_FUTURES_SYMBOLS_URL = "https://fapi.binance.com/fapi/v1/exchangeInfo"
 
-# Bybit
-BYBIT_SPOT_SYMBOLS_URL = "https://api.bybit.com/v5/market/instruments-info"
-BYBIT_FUTURES_SYMBOLS_URL = "https://api.bybit.com/v5/market/instruments-info"
-
 # CoinMarketCap
 COINMARKETCAP_QUOTES_URL = "https://pro-api.coinmarketcap.com/v2/cryptocurrency/quotes/latest"
 CMC_API_KEY = "951a1c7c-4e63-466e-8db7-3f4238162fd1"
 WORKER_SECRET = os.environ.get("WORKER_SECRET")
-DISABLE_SERVER_BINANCE_BYBIT = os.environ.get("DISABLE_SERVER_BINANCE_BYBIT", "0") == "1"
+_disable_server_binance_flag = os.environ.get("DISABLE_SERVER_BINANCE", os.environ.get("DISABLE_SERVER_BINANCE_BYBIT", "0"))
+DISABLE_SERVER_BINANCE = (_disable_server_binance_flag or "0") == "1"
 
 # ---------------------------------------------------------------------------
 # FLASK APP
@@ -49,7 +46,6 @@ app = Flask(__name__)
 data_store = {
     'mexc_list': [],
     'binance_list': [],
-    'bybit_list': [],
     'last_update': None,
     'stats': {}
 }
@@ -334,78 +330,6 @@ def process_binance(mexc_futures_coins: Set[str], mexc_positions_map: Dict[str, 
     return binance_list
 
 
-# ---------------------------------------------------------------------------
-# BYBIT FUNCTIONS
-# ---------------------------------------------------------------------------
-
-def fetch_bybit_futures_symbols() -> Set[str]:
-    """Bybit Futures'daki USDT çiftlerini çeker."""
-    try:
-        params = {"category": "linear"}
-        response = requests.get(BYBIT_FUTURES_SYMBOLS_URL, params=params, timeout=15)
-        response.raise_for_status()
-        data = response.json()
-        
-        symbols = set()
-        if data.get("retCode") == 0:
-            for item in data.get("result", {}).get("list", []):
-                status = item.get("status", "")
-                quote = item.get("quoteCoin", "")
-                base = item.get("baseCoin", "")
-                
-                if status == "Trading" and quote == "USDT" and base:
-                    symbols.add(base.upper())
-        
-        return symbols
-    except Exception as e:
-        print(f"[ERROR] Bybit Futures API hatasi: {e}")
-        return set()
-
-
-def process_bybit(mexc_futures_coins: Set[str], mexc_positions_map: Dict[str, float]):
-    """MEXC vadeli'de olup Bybit vadeli'de OLMAYAN coinleri bulur."""
-    print("\n[BYBIT] Futures coinleri cekiliyor...")
-    bybit_futures = fetch_bybit_futures_symbols()
-    if not bybit_futures:
-        print("[ERROR] Bybit Futures verileri alinamadi!")
-        return []
-    
-    not_in_bybit = sorted(list(mexc_futures_coins - bybit_futures))
-    print(f"[BYBIT] {len(not_in_bybit)} coin MEXC'de var, Bybit'te yok")
-
-    if not not_in_bybit:
-        return []
-
-    marketcaps = fetch_coinmarketcap_data(not_in_bybit)
-
-    coins_with_mc = []
-    coins_without_mc = []
-
-    for symbol in not_in_bybit:
-        mc = marketcaps.get(symbol)
-        max_pos = mexc_positions_map.get(symbol, 0.0)
-        if mc is not None:
-            coins_with_mc.append((symbol, max_pos, mc))
-        else:
-            coins_without_mc.append((symbol, max_pos, None))
-
-    coins_with_mc.sort(key=lambda x: x[2], reverse=True)
-    all_coins = coins_with_mc + coins_without_mc
-
-    # JSON formatına dönüştür
-    bybit_list = []
-    for idx, (symbol, max_pos, mc) in enumerate(all_coins, 1):
-        bybit_list.append({
-            'rank': idx,
-            'symbol': symbol,
-            'max_position': max_pos,
-            'max_position_pretty': grouped_currency(max_pos),
-            'market_cap': mc if mc else 0,
-            'market_cap_pretty': grouped_currency(mc) if mc else "N/A"
-        })
-
-    print(f"[BYBIT] {len(bybit_list)} coin islendi")
-    return bybit_list
 
 
 # ---------------------------------------------------------------------------
@@ -425,28 +349,24 @@ def update_data():
         mexc_futures_coins, mexc_positions_map, mexc_list = process_mexc()
         
         if mexc_futures_coins is not None and mexc_positions_map is not None:
-            if not DISABLE_SERVER_BINANCE_BYBIT:
+            if not DISABLE_SERVER_BINANCE:
                 binance_list = process_binance(mexc_futures_coins, mexc_positions_map)
-                bybit_list = process_bybit(mexc_futures_coins, mexc_positions_map)
             else:
                 binance_list = data_store.get('binance_list', [])
-                bybit_list = data_store.get('bybit_list', [])
-                print("[INFO] Sunucu Binance/Bybit verisini bekliyor (worker aracılığıyla).")
+                print("[INFO] Sunucu Binance verisini bekliyor (worker aracılığıyla).")
             
             with data_lock:
                 data_store['mexc_list'] = mexc_list
-                if not DISABLE_SERVER_BINANCE_BYBIT:
+                if not DISABLE_SERVER_BINANCE:
                     data_store['binance_list'] = binance_list
-                    data_store['bybit_list'] = bybit_list
                 data_store['last_update'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                 stats = data_store.get('stats', {})
                 stats['mexc_count'] = len(mexc_list)
-                if not DISABLE_SERVER_BINANCE_BYBIT:
+                if not DISABLE_SERVER_BINANCE:
                     stats['binance_count'] = len(binance_list)
-                    stats['bybit_count'] = len(bybit_list)
                 data_store['stats'] = stats
             
-            print(f"\n[SUCCESS] Ilk veri yuklendi: MEXC={len(mexc_list)}, Binance={len(data_store['binance_list'])}, Bybit={len(data_store['bybit_list'])}")
+            print(f"\n[SUCCESS] Ilk veri yuklendi: MEXC={len(mexc_list)}, Binance={len(data_store['binance_list'])}")
     except Exception as e:
         print(f"[ERROR] Ilk veri yukleme hatasi: {e}")
     
@@ -465,28 +385,24 @@ def update_data():
                 time.sleep(5)
                 continue
             
-            if not DISABLE_SERVER_BINANCE_BYBIT:
+            if not DISABLE_SERVER_BINANCE:
                 binance_list = process_binance(mexc_futures_coins, mexc_positions_map)
-                bybit_list = process_bybit(mexc_futures_coins, mexc_positions_map)
             else:
                 binance_list = data_store.get('binance_list', [])
-                bybit_list = data_store.get('bybit_list', [])
             
             # Global veri deposunu güncelle
             with data_lock:
                 data_store['mexc_list'] = mexc_list
-                if not DISABLE_SERVER_BINANCE_BYBIT:
+                if not DISABLE_SERVER_BINANCE:
                     data_store['binance_list'] = binance_list
-                    data_store['bybit_list'] = bybit_list
                 data_store['last_update'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                 stats = data_store.get('stats', {})
                 stats['mexc_count'] = len(mexc_list)
-                if not DISABLE_SERVER_BINANCE_BYBIT:
+                if not DISABLE_SERVER_BINANCE:
                     stats['binance_count'] = len(binance_list)
-                    stats['bybit_count'] = len(bybit_list)
                 data_store['stats'] = stats
             
-            print(f"\n[SUCCESS] Veri guncellendi: MEXC={len(mexc_list)}, Binance={len(data_store['binance_list'])}, Bybit={len(data_store['bybit_list'])}")
+            print(f"\n[SUCCESS] Veri guncellendi: MEXC={len(mexc_list)}, Binance={len(data_store['binance_list'])}")
             
         except Exception as e:
             print(f"[ERROR] Veri guncelleme hatasi: {e}")
@@ -542,16 +458,6 @@ def get_binance():
         })
 
 
-@app.route('/api/bybit')
-def get_bybit():
-    """Bybit karşılaştırma verilerini döndür."""
-    with data_lock:
-        return jsonify({
-            'data': data_store['bybit_list'],
-            'last_update': data_store['last_update']
-        })
-
-
 @app.route('/api/worker/update', methods=['POST'])
 def worker_update():
     """Arka plan worker'ından gelen verileri kabul eder."""
@@ -565,7 +471,7 @@ def worker_update():
         return jsonify({'error': 'Yetkisiz erişim'}), 401
 
     with data_lock:
-        for key in ('mexc_list', 'binance_list', 'bybit_list'):
+        for key in ('mexc_list', 'binance_list'):
             if isinstance(payload.get(key), list):
                 data_store[key] = payload[key]
 
@@ -577,8 +483,7 @@ def worker_update():
         else:
             data_store['stats'] = {
                 'mexc_count': len(data_store.get('mexc_list', [])),
-                'binance_count': len(data_store.get('binance_list', [])),
-                'bybit_count': len(data_store.get('bybit_list', []))
+                'binance_count': len(data_store.get('binance_list', []))
             }
 
         if payload.get('last_update'):
@@ -615,7 +520,6 @@ def main():
     print("  - /api/data     (Tum veriler)")
     print("  - /api/mexc     (MEXC vadeli)")
     print("  - /api/binance  (MEXC vs Binance)")
-    print("  - /api/bybit    (MEXC vs Bybit)")
     print("\n[SERVER] Duraklatmak icin Ctrl+C")
     print("="*80 + "\n")
     

@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """Proxy Worker
 
-Binance ve Bybit API'leri Render gibi ortamlarda engellendiğinde, bu script
+Binance API'leri Render gibi ortamlarda engellendiğinde, bu script
 kendi bilgisayarınızdan (veya erişim izni olan bir sunucudan) verileri çeker ve
 sonuçları ana dashboard uygulamasına gönderir.
 
@@ -25,8 +25,7 @@ from datetime import datetime
 
 from crypto_web_dashboard import (
     process_mexc,
-    process_binance,
-    process_bybit
+    process_binance
 )
 
 
@@ -59,23 +58,20 @@ def push_payload(payload):
 
 
 def build_payload():
-    """MEXC + Binance + Bybit verilerini hazırla."""
+    """MEXC + Binance verilerini hazırla."""
     mexc_futures_coins, mexc_positions_map, mexc_list = process_mexc()
     if mexc_futures_coins is None or mexc_positions_map is None:
         raise RuntimeError("MEXC verileri alınamadı, worker durdu.")
 
     binance_list = process_binance(mexc_futures_coins, mexc_positions_map) or []
-    bybit_list = process_bybit(mexc_futures_coins, mexc_positions_map) or []
 
     payload = {
         'secret': WORKER_SECRET,
         'mexc_list': mexc_list,
         'binance_list': binance_list,
-        'bybit_list': bybit_list,
         'stats': {
             'mexc_count': len(mexc_list),
-            'binance_count': len(binance_list),
-            'bybit_count': len(bybit_list)
+            'binance_count': len(binance_list)
         },
         'last_update': datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')
     }
