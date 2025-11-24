@@ -103,6 +103,30 @@ crypto-dashboard/
 - `GET /api/mexc` - MEXC vadeli listesi (JSON)
 - `GET /api/binance` - Binance karşılaştırması (JSON)
 - `GET /api/bybit` - Bybit karşılaştırması (JSON)
+- `POST /api/worker/update` - Proxy worker tarafından çağrılır (gizli anahtar gerektirir)
+
+## 🛰️ Proxy Worker ile Binance/Bybit Verileri
+
+Render gibi ortamlarda Binance/Bybit API'leri engellendiğinde, `proxy_worker.py`
+dosyasıyla kendi bilgisayarınızdan verileri çekip dashboard'a gönderebilirsiniz.
+
+1. `.env` veya terminal ortamınıza gizli anahtar tanımlayın:
+   ```bash
+   export WORKER_SECRET=buraya-uzun-bir-anahtar-yazin
+   export DASHBOARD_URL=https://crypto-dashboard-uh1e.onrender.com
+   export DISABLE_SERVER_BINANCE_BYBIT=1   # Render hizmeti için
+   ```
+2. Render panelinde `WORKER_SECRET` ve `DISABLE_SERVER_BINANCE_BYBIT=1`
+   ortam değişkenlerini web servisine ekleyin.
+3. Kendi makinenizde (veya erişimi olan sunucuda) worker'ı başlatın:
+   ```bash
+   python proxy_worker.py
+   ```
+4. Worker Binance/Bybit verilerini çekip `/api/worker/update` endpoint'ine
+   gönderecek; dashboard saniyeler içinde güncellenecek.
+
+> Not: Proxy kullanmanız gerekiyorsa worker'ı çalıştırdığınız terminalde
+> `HTTP_PROXY` / `HTTPS_PROXY` değişkenlerini tanımlayabilirsiniz.
 
 ## ⚙️ Güncelleme Sıklığı
 

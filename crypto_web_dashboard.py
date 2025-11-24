@@ -11,7 +11,7 @@ import time
 import os
 from typing import Dict, List, Set, Tuple, Optional
 import warnings
-from flask import Flask, render_template, jsonify
+from flask import Flask, render_template, jsonify, request
 from threading import Thread, Lock
 from datetime import datetime
 
@@ -36,6 +36,8 @@ BYBIT_FUTURES_SYMBOLS_URL = "https://api.bybit.com/v5/market/instruments-info"
 # CoinMarketCap
 COINMARKETCAP_QUOTES_URL = "https://pro-api.coinmarketcap.com/v2/cryptocurrency/quotes/latest"
 CMC_API_KEY = "951a1c7c-4e63-466e-8db7-3f4238162fd1"
+WORKER_SECRET = os.environ.get("WORKER_SECRET")
+DISABLE_SERVER_BINANCE_BYBIT = os.environ.get("DISABLE_SERVER_BINANCE_BYBIT", "0") == "1"
 
 # ---------------------------------------------------------------------------
 # FLASK APP
@@ -423,21 +425,28 @@ def update_data():
         mexc_futures_coins, mexc_positions_map, mexc_list = process_mexc()
         
         if mexc_futures_coins is not None and mexc_positions_map is not None:
-            binance_list = process_binance(mexc_futures_coins, mexc_positions_map)
-            bybit_list = process_bybit(mexc_futures_coins, mexc_positions_map)
+            if not DISABLE_SERVER_BINANCE_BYBIT:
+                binance_list = process_binance(mexc_futures_coins, mexc_positions_map)
+                bybit_list = process_bybit(mexc_futures_coins, mexc_positions_map)
+            else:
+                binance_list = data_store.get('binance_list', [])
+                bybit_list = data_store.get('bybit_list', [])
+                print("[INFO] Sunucu Binance/Bybit verisini bekliyor (worker aracılığıyla).")
             
             with data_lock:
                 data_store['mexc_list'] = mexc_list
-                data_store['binance_list'] = binance_list
-                data_store['bybit_list'] = bybit_list
+                if not DISABLE_SERVER_BINANCE_BYBIT:
+                    data_store['binance_list'] = binance_list
+                    data_store['bybit_list'] = bybit_list
                 data_store['last_update'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                data_store['stats'] = {
-                    'mexc_count': len(mexc_list),
-                    'binance_count': len(binance_list),
-                    'bybit_count': len(bybit_list)
-                }
+                stats = data_store.get('stats', {})
+                stats['mexc_count'] = len(mexc_list)
+                if not DISABLE_SERVER_BINANCE_BYBIT:
+                    stats['binance_count'] = len(binance_list)
+                    stats['bybit_count'] = len(bybit_list)
+                data_store['stats'] = stats
             
-            print(f"\n[SUCCESS] Ilk veri yuklendi: MEXC={len(mexc_list)}, Binance={len(binance_list)}, Bybit={len(bybit_list)}")
+            print(f"\n[SUCCESS] Ilk veri yuklendi: MEXC={len(mexc_list)}, Binance={len(data_store['binance_list'])}, Bybit={len(data_store['bybit_list'])}")
     except Exception as e:
         print(f"[ERROR] Ilk veri yukleme hatasi: {e}")
     
@@ -456,22 +465,28 @@ def update_data():
                 time.sleep(5)
                 continue
             
-            binance_list = process_binance(mexc_futures_coins, mexc_positions_map)
-            bybit_list = process_bybit(mexc_futures_coins, mexc_positions_map)
+            if not DISABLE_SERVER_BINANCE_BYBIT:
+                binance_list = process_binance(mexc_futures_coins, mexc_positions_map)
+                bybit_list = process_bybit(mexc_futures_coins, mexc_positions_map)
+            else:
+                binance_list = data_store.get('binance_list', [])
+                bybit_list = data_store.get('bybit_list', [])
             
             # Global veri deposunu güncelle
             with data_lock:
                 data_store['mexc_list'] = mexc_list
-                data_store['binance_list'] = binance_list
-                data_store['bybit_list'] = bybit_list
+                if not DISABLE_SERVER_BINANCE_BYBIT:
+                    data_store['binance_list'] = binance_list
+                    data_store['bybit_list'] = bybit_list
                 data_store['last_update'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                data_store['stats'] = {
-                    'mexc_count': len(mexc_list),
-                    'binance_count': len(binance_list),
-                    'bybit_count': len(bybit_list)
-                }
+                stats = data_store.get('stats', {})
+                stats['mexc_count'] = len(mexc_list)
+                if not DISABLE_SERVER_BINANCE_BYBIT:
+                    stats['binance_count'] = len(binance_list)
+                    stats['bybit_count'] = len(bybit_list)
+                data_store['stats'] = stats
             
-            print(f"\n[SUCCESS] Veri guncellendi: MEXC={len(mexc_list)}, Binance={len(binance_list)}, Bybit={len(bybit_list)}")
+            print(f"\n[SUCCESS] Veri guncellendi: MEXC={len(mexc_list)}, Binance={len(data_store['binance_list'])}, Bybit={len(data_store['bybit_list'])}")
             
         except Exception as e:
             print(f"[ERROR] Veri guncelleme hatasi: {e}")
@@ -535,6 +550,43 @@ def get_bybit():
             'data': data_store['bybit_list'],
             'last_update': data_store['last_update']
         })
+
+
+@app.route('/api/worker/update', methods=['POST'])
+def worker_update():
+    """Arka plan worker'ından gelen verileri kabul eder."""
+    if not WORKER_SECRET:
+        return jsonify({'error': 'WORKER_SECRET tanımlı değil'}), 503
+
+    payload = request.get_json(silent=True) or {}
+    provided_secret = payload.get('secret') or request.headers.get('X-Worker-Secret')
+
+    if provided_secret != WORKER_SECRET:
+        return jsonify({'error': 'Yetkisiz erişim'}), 401
+
+    with data_lock:
+        for key in ('mexc_list', 'binance_list', 'bybit_list'):
+            if isinstance(payload.get(key), list):
+                data_store[key] = payload[key]
+
+        stats = payload.get('stats')
+        if isinstance(stats, dict):
+            existing = data_store.get('stats', {}).copy()
+            existing.update(stats)
+            data_store['stats'] = existing
+        else:
+            data_store['stats'] = {
+                'mexc_count': len(data_store.get('mexc_list', [])),
+                'binance_count': len(data_store.get('binance_list', [])),
+                'bybit_count': len(data_store.get('bybit_list', []))
+            }
+
+        if payload.get('last_update'):
+            data_store['last_update'] = payload['last_update']
+        else:
+            data_store['last_update'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+    return jsonify({'status': 'ok'})
 
 
 @app.before_request
